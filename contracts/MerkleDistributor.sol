@@ -12,9 +12,16 @@ contract MerkleDistributor is IMerkleDistributor {
     // This is a packed array of booleans.
     mapping(uint256 => uint256) private claimedBitMap;
 
-    constructor(address token_, bytes32 merkleRoot_) public {
+    address public immutable treasury;
+
+    uint256 private constant RECLAM_LENGTH = 90 * 24 * 60 * 60; // 90 days
+    uint256 public immutable reclaimDate;
+
+    constructor(address token_, bytes32 merkleRoot_, address treasury_) public {
         token = token_;
         merkleRoot = merkleRoot_;
+        treasury = treasury_;
+        reclaimDate = now + RECLAM_LENGTH;
     }
 
     function isClaimed(uint256 index) public view override returns (bool) {
@@ -29,6 +36,12 @@ contract MerkleDistributor is IMerkleDistributor {
         uint256 claimedWordIndex = index / 256;
         uint256 claimedBitIndex = index % 256;
         claimedBitMap[claimedWordIndex] = claimedBitMap[claimedWordIndex] | (1 << claimedBitIndex);
+    }
+
+    function reclaim() external {
+        require(msg.sender == treasury, "TRE");
+        require(now > reclaimDate, "DAT");
+        IERC20(token).transfer(treasury, IERC20(token).balanceOf(address(this)));
     }
 
     function claim(uint256 index, address account, uint256 amount, bytes32[] calldata merkleProof) external override {
